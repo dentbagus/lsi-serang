@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Playlist Fullscreen Auto-Loop</title>
+    <style>
+        /* Membuat halaman benar-benar hitam dan menghilangkan scrollbar */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        /* Membuat video memenuhi seluruh layar (Fullscreen) */
+        #videoPlayer {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Mengisi layar penuh tanpa merusak rasio video */
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <video id="videoPlayer" autoplay muted playsinline></video>
+
+    <script>
+        // 1. DAFTAR VIDEO KAMU
+        // Masukkan semua link atau nama file video kamu di dalam array ini
+        const playlist = [
+            "include/assets/video/Toppoki_HD.mp4",
+            "include/assets/video/DID Fresh Nutritious Sushi.mp4",
+            "include/assets/video/DID Kimbap.mp4",
+            "include/assets/video/DID SUSHI NATURE RECOMMENDATION.mp4",
+            "include/assets/video/Salmon Nigiri_HD.mp4",
+            "include/assets/video/Spicy Dakgangjeong_HD.mp4",
+            "include/assets/video/Toppoki_HD.mp4"
+        ];
+
+        let currentVideoIndex = 0;
+        const videoElement = document.getElementById('videoPlayer');
+
+        // 2. Fungsi untuk memutar video berdasarkan index
+        function playVideo(index) {
+            if (playlist.length === 0) return;
+            
+            videoElement.src = playlist[index];
+            videoElement.play().catch(error => {
+                console.log("Autoplay dicegah oleh browser, mencoba memutar lagi...", error);
+            });
+        }
+
+        // 3. Event Listener: Ketika video yang sekarang SELESAI diputar
+        videoElement.addEventListener('ended', function() {
+            // Naikkan index ke video berikutnya
+            currentVideoIndex++;
+
+            // Jika sudah mencapai akhir playlist, reset kembali ke video pertama (Looping Playlist)
+            if (currentVideoIndex >= playlist.length) {
+                currentVideoIndex = 0;
+            }
+
+            // Putar video berikutnya
+            playVideo(currentVideoIndex);
+        });
+
+        // Mulai putar video pertama saat halaman dibuka
+        window.onload = function() {
+            playVideo(currentVideoIndex);
+        };
+    </script>
+
+</body>
+</html>
