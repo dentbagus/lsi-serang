@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LSI Serang - Media Player Portrait</title>
+    <title>LSI Serang</title>
     <style>
-        /* Menghilangkan scrollbar dan membuat background hitam pekat */
         html, body {
             margin: 0;
             padding: 0;
@@ -13,31 +12,14 @@
             height: 100%;
             overflow: hidden;
             background-color: #000;
-            position: relative;
         }
 
-        /* Container utama untuk memutar konten.
-           Diputar ke kiri -90 derajat (counter-clockwise).
-           Lebar dan tingginya ditukar posisinya (width: 100vh dan height: 100vw) 
-           agar pas memenuhi layar setelah diputar.
-        */
-        .rotate-container {
-            width: 100vh;
-            height: 100vw;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(90deg);
-            transform-origin: center center;
-            overflow: hidden;
-            background-color: #000;
-        }
-
-        /* Mengatur video dan gambar agar pas di dalam container yang sudah diputar */
+        /* Mengatur video dan gambar agar memenuhi layar penuh */
         #videoPlayer, #imagePlayer {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Memastikan media memenuhi layar penuh tanpa gepeng */
+            transform: rotate(-90deg);
+            object-fit: cover;
             position: absolute;
             top: 0;
             left: 0;
@@ -47,18 +29,16 @@
 </head>
 <body>
 
-    <div class="rotate-container">
-        <video id="videoPlayer" autoplay muted playsinline></video>
-        <img id="imagePlayer" alt="Slideshow Image">
-    </div>
+    <video id="videoPlayer" autoplay muted playsinline></video>
+    <img id="imagePlayer" alt="Slideshow Image">
 
     <script>
-        // 1. DAFTAR PLAYLIST (Video & Gambar)
+        // 1. DAFTAR PLAYLIST (Bisa dicampur Video dan Gambar)
         const playlist = [
-            "../include/assets/video/pilar.mp4"
+            "../include/assets/video/pilar1.mp4"
         ];
 
-        // 2. DURASI TAMPILAN GAMBAR (5000ms = 5 detik)
+        // 2. DURASI TAMPILAN GAMBAR (Dalam satuan milidetik. 5000ms = 5 detik)
         const imageDuration = 5000; 
 
         let currentMediaIndex = 0;
@@ -71,19 +51,26 @@
         function playMedia(index) {
             if (playlist.length === 0) return;
             
+            // Bersihkan timer gambar sebelumnya jika ada
             clearTimeout(imageTimer);
+
             const mediaUrl = playlist[index];
+            
+            // Cek apakah file adalah gambar berdasarkan ekstensinya (.jpg, .jpeg, .png, .webp)
             const isImage = /\.(jpg|jpeg|png|webp)$/i.test(mediaUrl);
 
             if (isImage) {
+                // Tampilkan Gambar, Sembunyikan Video
                 videoElement.style.display = 'none';
                 videoElement.pause();
                 
                 imageElement.src = mediaUrl;
                 imageElement.style.display = 'block';
 
+                // Atur waktu tayang gambar sebelum pindah ke media berikutnya
                 imageTimer = setTimeout(nextMedia, imageDuration);
             } else {
+                // Tampilkan Video, Sembunyikan Gambar
                 imageElement.style.display = 'none';
                 
                 videoElement.src = mediaUrl;
@@ -98,6 +85,7 @@
         function nextMedia() {
             currentMediaIndex++;
 
+            // Jika sudah di akhir playlist, refresh halaman agar RAM TV bersih kembali
             if (currentMediaIndex >= playlist.length) {
                 console.log("Satu siklus selesai, merestart halaman...");
                 location.reload();
@@ -107,17 +95,20 @@
             playMedia(currentMediaIndex);
         }
 
+        // Event ketika video selesai diputar
         videoElement.addEventListener('ended', nextMedia);
 
+        // Proteksi eror jika file video/gambar rusak atau gagal load
         videoElement.addEventListener('error', function() {
-            console.log("Video error, skip...");
+            console.log("Video error, skip ke media berikutnya...");
             setTimeout(nextMedia, 2000);
         });
         imageElement.addEventListener('error', function() {
-            console.log("Gambar error, skip...");
+            console.log("Gambar error, skip ke media berikutnya...");
             nextMedia();
         });
 
+        // Mulai jalankan saat halaman terbuka
         window.onload = function() {
             playMedia(currentMediaIndex);
         };
