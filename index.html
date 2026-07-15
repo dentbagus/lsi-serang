@@ -32,8 +32,8 @@
 
     <script>
         // 1. DAFTAR VIDEO KAMU
-        // Masukkan semua link atau nama file video kamu di dalam array ini
         const playlist = [
+            "include/assets/video/Bulgogi Kimbap_HD.mp4",
             "include/assets/video/DID Fresh Nutritious Sushi.mp4",
             "include/assets/video/DID Kimbap.mp4",
             "include/assets/video/DID SUSHI NATURE RECOMMENDATION.mp4",
@@ -60,13 +60,24 @@
             // Naikkan index ke video berikutnya
             currentVideoIndex++;
 
-            // Jika sudah mencapai akhir playlist, reset kembali ke video pertama (Looping Playlist)
+            // [MODIFIKASI DI SINI] 
+            // Jika sudah mencapai akhir playlist, lakukan REFRESH halaman untuk membersihkan RAM TV
             if (currentVideoIndex >= playlist.length) {
-                currentVideoIndex = 0;
+                console.log("Playlist selesai, merestart halaman untuk mencegah stuck...");
+                location.reload(); 
+                return; // Menghentikan eksekusi kode di bawahnya karena halaman sedang dimuat ulang
             }
 
-            // Putar video berikutnya
+            // Jika belum habis, lanjut putar video berikutnya
             playVideo(currentVideoIndex);
+        });
+
+        // Proteksi tambahan: Jika video macet di tengah karena kendala loading file/error internet
+        videoElement.addEventListener('error', function() {
+            console.log("Terjadi error pada video, mencoba refresh halaman...");
+            setTimeout(function() {
+                location.reload();
+            }, 5000); // Tunggu 5 detik sebelum reload jika terjadi error
         });
 
         // Mulai putar video pertama saat halaman dibuka
