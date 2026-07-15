@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Playlist Fullscreen Auto-Loop</title>
+    <title>Sinkronisasi Video Otomatis (Auto-Duration)</title>
     <style>
-        /* Membuat halaman benar-benar hitam dan menghilangkan scrollbar */
         html, body {
             margin: 0;
             padding: 0;
@@ -13,70 +12,149 @@
             height: 100%;
             overflow: hidden;
             background-color: #000;
+            font-family: sans-serif;
         }
-
-        /* Membuat video memenuhi seluruh layar (Fullscreen) */
         #videoPlayer {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Mengisi layar penuh tanpa merusak rasio video */
+            object-fit: cover;
             position: absolute;
             top: 0;
             left: 0;
+        }
+        /* Indikator Loading di awal */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 1.2rem;
+            z-index: 10;
+            background: rgba(0,0,0,0.7);
+            padding: 15px 25px;
+            border-radius: 8px;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
         }
     </style>
 </head>
 <body>
 
-    <video id="videoPlayer" autoplay muted playsinline></video>
+    <div id="loading">Menghitung durasi video... (0%)</div>
+    <video id="videoPlayer" muted playsinline></video>
 
     <script>
-        // 1. DAFTAR VIDEO KAMU
-        // Masukkan semua link atau nama file video kamu di dalam array ini
-        const playlist = [
+        // 1. DAFTAR VIDEO KAMU (Bebas beda durasi, tidak perlu tulis durasinya lagi!)
+        const videoSources = [
+            "include/assets/video/Toppoki_HD.mp4",
             "include/assets/video/DID Fresh Nutritious Sushi.mp4",
             "include/assets/video/DID Kimbap.mp4",
-            "include/assets/video/DID SUSHI NATURE RECOMMENDATION.mp4"
+            "include/assets/video/DID SUSHI NATURE RECOMMENDATION.mp4",
+            "include/assets/video/Salmon Nigiri_HD.mp4",
+            "include/assets/video/Spicy Dakgangjeong_HD.mp4",
+            "include/assets/video/Toppoki_HD.mp4"
         ];
-        
-            // "include/assets/video/Toppoki_HD.mp4",
-            // "include/assets/video/DID Fresh Nutritious Sushi.mp4",
-            // "include/assets/video/DID Kimbap.mp4",
-            // "include/assets/video/DID SUSHI NATURE RECOMMENDATION.mp4",
-            // "include/assets/video/Salmon Nigiri_HD.mp4",
-            // "include/assets/video/Spicy Dakgangjeong_HD.mp4",
-            // "include/assets/video/Toppoki_HD.mp4"
 
-        let currentVideoIndex = 0;
+        const playlist = [];
+        let totalPlaylistDuration = 0;
         const videoElement = document.getElementById('videoPlayer');
+        const loadingElement = document.getElementById('loading');
 
-        // 2. Fungsi untuk memutar video berdasarkan index
-        function playVideo(index) {
-            if (playlist.length === 0) return;
+        // 2. Fungsi untuk mengambil durasi semua video secara otomatis di awal
+        async function loadAllVideoDurations() {
+            for (let i = 0; i < videoSources.length; i++) {
+                const src = videoSources[i];
+                updateLoadingStatus(i, videoSources.length);
+                
+                try {
+                    const duration = await getVideoDuration(src);
+                    playlist.push({ src, duration });
+                } catch (error) {
+                    console.error("Gagal memuat video: " + src, error);
+                    // Jika gagal, beri durasi default (misal 15 detik) agar tidak rusak sistemnya
+                    playlist.push({ src, duration: 15 });
+                }
+            }
             
-            videoElement.src = playlist[index];
-            videoElement.play().catch(error => {
-                console.log("Autoplay dicegah oleh browser, mencoba memutar lagi...", error);
+            // Hitung total durasi setelah semua durasi video didapatkan
+            totalPlaylistDuration = playlist.reduce((sum, item) => sum + item.duration, 0);
+            
+            // Sembunyikan indikator loading
+            loadingElement.style.opacity = '0';
+            setTimeout(() => loadingElement.remove(), 500);
+
+            // Mulai sinkronisasi berkala
+            setInterval(syncVideo, 1000);
+            syncVideo();
+        }
+
+        // Helper: Menggunakan Promise untuk mendapatkan durasi video tanpa memutarnya di layar
+        function getVideoDuration(src) {
+            return new Promise((resolve, reject) => {
+                const tempVideo = document.createElement('video');
+                tempVideo.src = src;
+                tempVideo.preload = 'metadata';
+                tempVideo.muted = true;
+                
+                tempVideo.onloadedmetadata = function() {
+                    resolve(tempVideo.duration);
+                };
+                
+                tempVideo.onerror = function() {
+                    reject();
+                };
             });
         }
 
-        // 3. Event Listener: Ketika video yang sekarang SELESAI diputar
-        videoElement.addEventListener('ended', function() {
-            // Naikkan index ke video berikutnya
-            currentVideoIndex++;
+        function updateLoadingStatus(current, total) {
+            const percent = Math.round((current / total) * 100);
+            loadingElement.innerText = `Menghitung durasi video... (${percent}%)`;
+        }
 
-            // Jika sudah mencapai akhir playlist, reset kembali ke video pertama (Looping Playlist)
-            if (currentVideoIndex >= playlist.length) {
-                currentVideoIndex = 0;
+        // 3. Sistem Sinkronisasi Waktu (Sama seperti sebelumnya)
+        function syncVideo() {
+            if (playlist.length === 0 || totalPlaylistDuration === 0) return;
+
+            const currentEpochTime = Date.now() / 1000; // Menggunakan milidetik agar lebih presisi desimalnya
+            const currentCycleTime = currentEpochTime % totalPlaylistDuration;
+
+            let elapsed = 0;
+            let targetVideoIndex = 0;
+            let targetVideoTime = 0;
+
+            for (let i = 0; i < playlist.length; i++) {
+                if (currentCycleTime < elapsed + playlist[i].duration) {
+                    targetVideoIndex = i;
+                    targetVideoTime = currentCycleTime - elapsed;
+                    break;
+                }
+                elapsed += playlist[i].duration;
             }
 
-            // Putar video berikutnya
-            playVideo(currentVideoIndex);
-        });
+            const targetSrc = playlist[targetVideoIndex].src;
 
-        // Mulai putar video pertama saat halaman dibuka
+            if (videoElement.getAttribute('data-current-src') !== targetSrc) {
+                videoElement.src = targetSrc;
+                videoElement.setAttribute('data-current-src', targetSrc);
+                videoElement.currentTime = targetVideoTime;
+                videoElement.play().catch(e => console.log("Menunggu interaksi klik pertama dari user..."));
+            } else {
+                // Toleransi perbedaan waktu antar device adalah 1.2 detik sebelum dipaksa sinkron ulang
+                if (Math.abs(videoElement.currentTime - targetVideoTime) > 1.2) {
+                    videoElement.currentTime = targetVideoTime;
+                }
+            }
+        }
+
+        // Mulai proses saat halaman dimuat
         window.onload = function() {
-            playVideo(currentVideoIndex);
+            loadAllVideoDurations();
+
+            // Aturan browser: Butuh minimal 1x klik layar dari user agar autoplay bersuara/berjalan mulus
+            document.body.addEventListener('click', () => {
+                videoElement.play().catch(e => {});
+            }, { once: true });
         };
     </script>
 
