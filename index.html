@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LSI Serang</title>
     <style>
-        /* Membuat halaman benar-benar hitam dan menghilangkan scrollbar */
         html, body {
             margin: 0;
             padding: 0;
@@ -15,74 +14,113 @@
             background-color: #000;
         }
 
-        /* Membuat video memenuhi seluruh layar (Fullscreen) */
-        #videoPlayer {
+        /* Mengatur video dan gambar agar memenuhi layar penuh */
+        #videoPlayer, #imagePlayer {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Mengisi layar penuh tanpa merusak rasio video */
+            object-fit: cover;
             position: absolute;
             top: 0;
             left: 0;
+            display: none; /* Sembunyikan secara default */
         }
     </style>
 </head>
 <body>
 
     <video id="videoPlayer" autoplay muted playsinline></video>
+    <img id="imagePlayer" alt="Slideshow Image">
 
     <script>
-        // 1. DAFTAR VIDEO KAMU
+        // 1. DAFTAR PLAYLIST (Bisa dicampur Video dan Gambar)
         const playlist = [
             "include/assets/video/Bulgogi Kimbap_HD.mp4",
             "include/assets/video/DID Fresh Nutritious Sushi.mp4",
             "include/assets/video/DID Kimbap.mp4",
+            "include/assets/image/promo_sushi.jpg", 
             "include/assets/video/DID SUSHI NATURE RECOMMENDATION.mp4",
+            "include/assets/image/banner_kimbap.png",
             "include/assets/video/Salmon Nigiri_HD.mp4",
             "include/assets/video/Spicy Dakgangjeong_HD.mp4",
-            "include/assets/video/Toppoki_HD.mp4"
+            "include/assets/video/Toppoki_HD.mp4",
+            "include/assets/video/Kimbab.mp4",
+            "include/assets/video/Korean Roll.mp4",
+            "include/assets/video/Tteokbokki.mp4"
         ];
 
-        let currentVideoIndex = 0;
-        const videoElement = document.getElementById('videoPlayer');
+        // 2. DURASI TAMPILAN GAMBAR (Dalam satuan milidetik. 5000ms = 5 detik)
+        const imageDuration = 5000; 
 
-        // 2. Fungsi untuk memutar video berdasarkan index
-        function playVideo(index) {
+        let currentMediaIndex = 0;
+        let imageTimer = null;
+        
+        const videoElement = document.getElementById('videoPlayer');
+        const imageElement = document.getElementById('imagePlayer');
+
+        // 3. Fungsi utama untuk memutar media
+        function playMedia(index) {
             if (playlist.length === 0) return;
             
-            videoElement.src = playlist[index];
-            videoElement.play().catch(error => {
-                console.log("Autoplay dicegah oleh browser, mencoba memutar lagi...", error);
-            });
+            // Bersihkan timer gambar sebelumnya jika ada
+            clearTimeout(imageTimer);
+
+            const mediaUrl = playlist[index];
+            
+            // Cek apakah file adalah gambar berdasarkan ekstensinya (.jpg, .jpeg, .png, .webp)
+            const isImage = /\.(jpg|jpeg|png|webp)$/i.test(mediaUrl);
+
+            if (isImage) {
+                // Tampilkan Gambar, Sembunyikan Video
+                videoElement.style.display = 'none';
+                videoElement.pause();
+                
+                imageElement.src = mediaUrl;
+                imageElement.style.display = 'block';
+
+                // Atur waktu tayang gambar sebelum pindah ke media berikutnya
+                imageTimer = setTimeout(nextMedia, imageDuration);
+            } else {
+                // Tampilkan Video, Sembunyikan Gambar
+                imageElement.style.display = 'none';
+                
+                videoElement.src = mediaUrl;
+                videoElement.style.display = 'block';
+                videoElement.play().catch(error => {
+                    console.log("Autoplay ditolak, mencoba lagi...", error);
+                });
+            }
         }
 
-        // 3. Event Listener: Ketika video yang sekarang SELESAI diputar
-        videoElement.addEventListener('ended', function() {
-            // Naikkan index ke video berikutnya
-            currentVideoIndex++;
+        // 4. Fungsi untuk bergeser ke media berikutnya
+        function nextMedia() {
+            currentMediaIndex++;
 
-            // [MODIFIKASI DI SINI] 
-            // Jika sudah mencapai akhir playlist, lakukan REFRESH halaman untuk membersihkan RAM TV
-            if (currentVideoIndex >= playlist.length) {
-                console.log("Playlist selesai, merestart halaman untuk mencegah stuck...");
-                location.reload(); 
-                return; // Menghentikan eksekusi kode di bawahnya karena halaman sedang dimuat ulang
+            // Jika sudah di akhir playlist, refresh halaman agar RAM TV bersih kembali
+            if (currentMediaIndex >= playlist.length) {
+                console.log("Satu siklus selesai, merestart halaman...");
+                location.reload();
+                return;
             }
 
-            // Jika belum habis, lanjut putar video berikutnya
-            playVideo(currentVideoIndex);
-        });
+            playMedia(currentMediaIndex);
+        }
 
-        // Proteksi tambahan: Jika video macet di tengah karena kendala loading file/error internet
+        // Event ketika video selesai diputar
+        videoElement.addEventListener('ended', nextMedia);
+
+        // Proteksi eror jika file video/gambar rusak atau gagal load
         videoElement.addEventListener('error', function() {
-            console.log("Terjadi error pada video, mencoba refresh halaman...");
-            setTimeout(function() {
-                location.reload();
-            }, 5000); // Tunggu 5 detik sebelum reload jika terjadi error
+            console.log("Video error, skip ke media berikutnya...");
+            setTimeout(nextMedia, 2000);
+        });
+        imageElement.addEventListener('error', function() {
+            console.log("Gambar error, skip ke media berikutnya...");
+            nextMedia();
         });
 
-        // Mulai putar video pertama saat halaman dibuka
+        // Mulai jalankan saat halaman terbuka
         window.onload = function() {
-            playVideo(currentVideoIndex);
+            playMedia(currentMediaIndex);
         };
     </script>
 
