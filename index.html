@@ -12,8 +12,9 @@
             height: 100%;
             overflow: hidden;
             background-color: #000;
+            font-family: sans-serif;
         }
-        video {
+        #videoPlayer {
             width: 100%;
             height: 100%;
             object-fit: cover;
@@ -21,14 +22,30 @@
             top: 0;
             left: 0;
         }
+        /* Indikator Loading di awal */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 1.2rem;
+            z-index: 10;
+            background: rgba(0,0,0,0.7);
+            padding: 15px 25px;
+            border-radius: 8px;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
     </style>
 </head>
 <body>
 
+    <div id="loading">Menghitung durasi video... (0%)</div>
     <video id="videoPlayer" muted playsinline></video>
 
     <script>
-        // DAFTAR VIDEO (Isi dengan link video kamu)
+        // 1. DAFTAR VIDEO KAMU (Bebas beda durasi, tidak perlu tulis durasinya lagi!)
         const videoSources = [
             "include/assets/video/Toppoki_HD.mp4",
             "include/assets/video/DID Fresh Nutritious Sushi.mp4",
@@ -39,18 +56,67 @@
             "include/assets/video/Toppoki_HD.mp4"
         ];
 
-        // MASUKKAN DURASI MANUAL DI SINI (Khusus TV, input manual jauh lebih aman dibanding load otomatis agar RAM TV tidak habis di awal)
-        const playlist = [
-            { src: videoSources[0], duration: 30 },
-            { src: videoSources[1], duration: 15 },
-            { src: videoSources[2], duration: 24 }
-        ];
-
-        const totalPlaylistDuration = playlist.reduce((sum, item) => sum + item.duration, 0);
+        const playlist = [];
+        let totalPlaylistDuration = 0;
         const videoElement = document.getElementById('videoPlayer');
+        const loadingElement = document.getElementById('loading');
 
+        // 2. Fungsi untuk mengambil durasi semua video secara otomatis di awal
+        async function loadAllVideoDurations() {
+            for (let i = 0; i < videoSources.length; i++) {
+                const src = videoSources[i];
+                updateLoadingStatus(i, videoSources.length);
+                
+                try {
+                    const duration = await getVideoDuration(src);
+                    playlist.push({ src, duration });
+                } catch (error) {
+                    console.error("Gagal memuat video: " + src, error);
+                    // Jika gagal, beri durasi default (misal 15 detik) agar tidak rusak sistemnya
+                    playlist.push({ src, duration: 15 });
+                }
+            }
+            
+            // Hitung total durasi setelah semua durasi video didapatkan
+            totalPlaylistDuration = playlist.reduce((sum, item) => sum + item.duration, 0);
+            
+            // Sembunyikan indikator loading
+            loadingElement.style.opacity = '0';
+            setTimeout(() => loadingElement.remove(), 500);
+
+            // Mulai sinkronisasi berkala
+            setInterval(syncVideo, 1000);
+            syncVideo();
+        }
+
+        // Helper: Menggunakan Promise untuk mendapatkan durasi video tanpa memutarnya di layar
+        function getVideoDuration(src) {
+            return new Promise((resolve, reject) => {
+                const tempVideo = document.createElement('video');
+                tempVideo.src = src;
+                tempVideo.preload = 'metadata';
+                tempVideo.muted = true;
+                
+                tempVideo.onloadedmetadata = function() {
+                    resolve(tempVideo.duration);
+                };
+                
+                tempVideo.onerror = function() {
+                    reject();
+                };
+            });
+        }
+
+        function updateLoadingStatus(current, total) {
+            const percent = Math.round((current / total) * 100);
+            loadingElement.innerText = `Menghitung durasi video... (${percent}%)`;
+        }
+
+        // 3. Sistem Sinkronisasi Waktu (Sama seperti sebelumnya)
         function syncVideo() {
-            const currentEpochTime = Math.floor(Date.now() / 1000);
+            if (playlist.length === 0 || totalPlaylistDuration === 0) return;
+
+            const currentEpochTime = Date.now() / 1000; // Menggunakan milidetik agar lebih presisi desimalnya
             const currentCycleTime = currentEpochTime % totalPlaylistDuration;
 
             let elapsed = 0;
@@ -72,27 +138,22 @@
                 videoElement.src = targetSrc;
                 videoElement.setAttribute('data-current-src', targetSrc);
                 videoElement.currentTime = targetVideoTime;
-                videoElement.play().catch(e => console.log(e));
+                videoElement.play().catch(e => console.log("Menunggu interaksi klik pertama dari user..."));
+            } else {
+                // Toleransi perbedaan waktu antar device adalah 1.2 detik sebelum dipaksa sinkron ulang
+                if (Math.abs(videoElement.currentTime - targetVideoTime) > 1.2) {
+                    videoElement.currentTime = targetVideoTime;
+                }
             }
         }
 
-        // Ketika video selesai, langsung panggil fungsi sinkronisasi untuk memicu video berikutnya
-        videoElement.addEventListener('ended', function() {
-            syncVideo();
-        });
-
-        // Proteksi eror: Jika video macet karena buffer internet, coba paksa jalan lagi setelah 5 detik
-        videoElement.addEventListener('error', function() {
-            setTimeout(syncVideo, 5000);
-        });
-
+        // Mulai proses saat halaman dimuat
         window.onload = function() {
-            syncVideo();
-            
-            // TV LG sering memblokir autoplay jika tidak ada interaksi awal.
-            // Setelah web dibuka di TV, tekan tombol apa saja di remote (misal tombol OK/tengah) pada layar TV.
+            loadAllVideoDurations();
+
+            // Aturan browser: Butuh minimal 1x klik layar dari user agar autoplay bersuara/berjalan mulus
             document.body.addEventListener('click', () => {
-                videoElement.play();
+                videoElement.play().catch(e => {});
             }, { once: true });
         };
     </script>
