@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LSI Serang - Media Player Portrait</title>
+    <style>
+        /* Menghilangkan scrollbar dan membuat background hitam pekat */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            position: relative;
+        }
+
+        /* Container utama untuk memutar konten.
+           Diputar ke kiri -90 derajat (counter-clockwise).
+           Lebar dan tingginya ditukar posisinya (width: 100vh dan height: 100vw) 
+           agar pas memenuhi layar setelah diputar.
+        */
+        .rotate-container {
+            width: 100vh;
+            height: 100vw;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(90deg);
+            transform-origin: center center;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        /* Mengatur video dan gambar agar pas di dalam container yang sudah diputar */
+        #videoPlayer, #imagePlayer {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Memastikan media memenuhi layar penuh tanpa gepeng */
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: none; /* Sembunyikan secara default */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="rotate-container">
+        <video id="videoPlayer" autoplay muted playsinline></video>
+        <img id="imagePlayer" alt="Slideshow Image">
+    </div>
+
+    <script>
+        // 1. DAFTAR PLAYLIST (Video & Gambar)
+        const playlist = [
+            "../include/assets/video/fresh.mp4"
+        ];
+
+        // 2. DURASI TAMPILAN GAMBAR (5000ms = 5 detik)
+        const imageDuration = 5000; 
+
+        let currentMediaIndex = 0;
+        let imageTimer = null;
+        
+        const videoElement = document.getElementById('videoPlayer');
+        const imageElement = document.getElementById('imagePlayer');
+
+        // 3. Fungsi utama untuk memutar media
+        function playMedia(index) {
+            if (playlist.length === 0) return;
+            
+            clearTimeout(imageTimer);
+            const mediaUrl = playlist[index];
+            const isImage = /\.(jpg|jpeg|png|webp)$/i.test(mediaUrl);
+
+            if (isImage) {
+                videoElement.style.display = 'none';
+                videoElement.pause();
+                
+                imageElement.src = mediaUrl;
+                imageElement.style.display = 'block';
+
+                imageTimer = setTimeout(nextMedia, imageDuration);
+            } else {
+                imageElement.style.display = 'none';
+                
+                videoElement.src = mediaUrl;
+                videoElement.style.display = 'block';
+                videoElement.play().catch(error => {
+                    console.log("Autoplay ditolak, mencoba lagi...", error);
+                });
+            }
+        }
+
+        // 4. Fungsi untuk bergeser ke media berikutnya
+        function nextMedia() {
+            currentMediaIndex++;
+
+            if (currentMediaIndex >= playlist.length) {
+                console.log("Satu siklus selesai, merestart halaman...");
+                location.reload();
+                return;
+            }
+
+            playMedia(currentMediaIndex);
+        }
+
+        videoElement.addEventListener('ended', nextMedia);
+
+        videoElement.addEventListener('error', function() {
+            console.log("Video error, skip...");
+            setTimeout(nextMedia, 2000);
+        });
+        imageElement.addEventListener('error', function() {
+            console.log("Gambar error, skip...");
+            nextMedia();
+        });
+
+        window.onload = function() {
+            playMedia(currentMediaIndex);
+        };
+    </script>
+
+</body>
+</html>
