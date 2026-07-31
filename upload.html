@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Form Scan Barcode & Upload Implem</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f4f6f9; padding: 20px; display: flex; justify-content: center; }
+    .card { background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 480px; }
+    h2 { margin-top: 0; color: #333; text-align: center; }
+    .form-group { margin-bottom: 18px; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; color: #444; }
+    input[type="text"], input[type="file"], textarea { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    input:focus { border-color: #2563eb; outline: none; }
+    .status-msg { font-size: 13px; margin-top: 5px; font-weight: 600; min-height: 18px; }
+    .valid { color: #16a34a; }
+    .invalid { color: #dc2626; }
+    .loading { color: #2563eb; }
+    .preview-img { max-width: 100%; height: auto; border-radius: 6px; margin-top: 10px; display: none; border: 1px solid #ddd; }
+    button { width: 100%; padding: 12px; background-color: #2563eb; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    button:disabled { background-color: #94a3b8; cursor: not-allowed; }
+    button:hover:not(:disabled) { background-color: #1d4ed8; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Upload Implementasi</h2>
+  <form id="uploadForm">
+    
+    <!-- 1. FIELD BARCODE -->
+    <div class="form-group">
+      <label for="barcode">Scan / Input Barcode:</label>
+      <input type="text" id="barcode" placeholder="Arahkan scanner ke sini..." autofocus autocomplete="off" required>
+      <div id="barcodeStatus" class="status-msg"></div>
+    </div>
+
+    <!-- 2. FIELD NAMA BARANG (AUTO-FILL SEMENTARA) -->
+    <div class="form-group">
+      <label for="namaBarang">Nama Barang / Produk:</label>
+      <input type="text" id="namaBarang" placeholder="Otomatis terisi jika barcode valid..." readonly style="background-color: #f1f5f9;">
+    </div>
+
+    <!-- 3. FIELD UPLOAD FOTO IMPLEMENTASI -->
+    <div class="form-group">
+      <label for="fotoInput">Foto Hasil Implementasi:</label>
+      <input type="file" id="fotoInput" accept="image/*" capture="environment" required disabled>
+      <img id="preview" class="preview-img" alt="Preview Gambar">
+      <div id="fotoStatus" class="status-msg"></div>
+    </div>
+
+    <!-- 4. FIELD KETERANGAN (OPSIONAL) -->
+    <div class="form-group">
+      <label for="keterangan">Keterangan / Catatan:</label>
+      <textarea id="keterangan" rows="2" placeholder="Masukkan catatan tambahan jika ada..."></textarea>
+    </div>
+
+    <!-- TOMBOL SUBMIT -->
+    <button type="submit" id="btnSubmit" disabled>Kirim Data</button>
+  </form>
+</div>
+
+<!-- SDK Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+  // ==========================================
+  // CONFIG SUPABASE & SETTINGS
+  // ==========================================
+  const SUPABASE_URL = 'https://PROJECT-ANDA.supabase.co';
+  const SUPABASE_ANON_KEY = 'ANON_KEY_ANDA';
+  const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Element DOM
+  const barcodeInput = document.getElementById('barcode');
+  const barcodeStatus = document.getElementById('barcodeStatus');
+  const namaBarangInput = document.getElementById('namaBarang');
+  const fotoInput = document.getElementById('fotoInput');
+  const fotoStatus = document.getElementById('fotoStatus');
+  const previewImg = document.getElementById('preview');
+  const btnSubmit = document.getElementById('btnSubmit');
+  const uploadForm = document.getElementById('uploadForm');
+
+  let compressedFileBlob = null;
+  let timerDebounce = null;
+  let isBarcodeValid = false;
+
+  // ==========================================
+  // 1. CEK VALIDASI BARCODE REAL-TIME (DEBOUNCE 300MS)
+  // ==========================================
+  barcodeInput.addEventListener('input', function() {
+    const code = this.value.trim();
+    clearTimeout(timerDebounce);
+    resetFormValidation();
+
+    if (!code) return;
+
+    barcodeStatus.className = 'status-msg loading';
+    barcodeStatus.innerText = '🔍 Memeriksa master barcode...';
+
+    timerDebounce = setTimeout(async () => {
+      // Query ke tabel master Supabase (Memanfaatkan Indexing)
+      const { data, error } = await supabase
+        .from('master_barang')
+        .select('barcode, nama_barang')
+        .eq('barcode', code)
+        .maybeSingle();
+
+      if (error) {
+        barcodeStatus.className = 'status-msg invalid';
+        barcodeStatus.innerText = '⚠️ Gagal terhubung ke database server.';
+        return;
+      }
+
+      if (data) {
+        // BARCODE VALID
+        isBarcodeValid = true;
+        barcodeStatus.className = 'status-msg valid';
+        barcodeStatus.innerText = '✅ Barcode Valid!';
+        namaBarangInput.value = data.nama_barang;
+        fotoInput.disabled = false; // Buka input foto
+        checkFormValidity();
+      } else {
+        // BARCODE TIDAK DITEMUKAN
+        isBarcodeValid = false;
+        barcodeStatus.className = 'status-msg invalid';
+        barcodeStatus.innerText = '❌ Barcode tidak terdaftar dalam master!';
+        namaBarangInput.value = '';
+        fotoInput.disabled = true;
+        btnSubmit.disabled = true;
+      }
+    }, 300);
+  });
+
+  // ==========================================
+  // 2. KOMPRESI GAMBAR DI BROWSER (CANVAS API)
+  // ==========================================
+  fotoInput.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    fotoStatus.className = 'status-msg loading';
+    fotoStatus.innerText = '⚡ Mengompresi ukuran gambar...';
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = function(event) {
+      const img = new Image();
+      img.src = event.target.result;
+
+      img.onload = function() {
+        const maxWidth = 1280; // Maksimal lebar foto (HD resolution cukup untuk dokumentasi)
+        let scale = maxWidth / img.width;
+        
+        if (scale > 1) scale = 1; // Jika foto asli lebih kecil dari 1280px, jangan diperbesar
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        // Export ke format WebP / JPEG dengan kualitas 0.75 (Sangat kompresif)
+        canvas.toBlob((blob) => {
+          compressedFileBlob = blob;
+          
+          // Preview gambar yang sudah dikompres
+          previewImg.src = URL.createObjectURL(blob);
+          previewImg.style.display = 'block';
+
+          const originalMB = (file.size / (1024 * 1024)).toFixed(2);
+          const compressedKB = (blob.size / 1024).toFixed(0);
+
+          fotoStatus.className = 'status-msg valid';
+          fotoStatus.innerText = `✅ Foto siap! Ukuran berkurang dari ${originalMB} MB ➡️ ${compressedKB} KB`;
+          
+          checkFormValidity();
+        }, 'image/jpeg', 0.75);
+      };
+    };
+  });
+
+  // ==========================================
+  // 3. SUBMIT FORM & UPLOAD DATA
+  // ==========================================
+  uploadForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    btnSubmit.disabled = true;
+    btnSubmit.innerText = '⏳ Mengunggah Data...';
+
+    try {
+      const barcodeValue = barcodeInput.value.trim();
+      const namaBarangValue = namaBarangInput.value;
+      const keteranganValue = document.getElementById('keterangan').value;
+      
+      // A. Upload Foto ke Supabase Storage / Cloudflare R2
+      const fileName = `impl_${barcodeValue}_${Date.now()}.jpg`;
+      
+      const { data: uploadData, error: uploadError } = await supabase
+        .storage
+        .from('implementasi-foto') // Nama Bucket
+        .upload(fileName, compressedFileBlob, {
+          contentType: 'image/jpeg'
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Ambil Public URL Foto
+      const { data: urlData } = supabase
+        .storage
+        .from('implementasi-foto')
+        .getPublicUrl(fileName);
+
+      const photoUrl = urlData.publicUrl;
+
+      // B. Simpan Log Transaksi ke Database
+      const { error: insertError } = await supabase
+        .from('transaksi_implementasi')
+        .insert([
+          {
+            barcode: barcodeValue,
+            nama_barang: namaBarangValue,
+            foto_url: photoUrl,
+            keterangan: keteranganValue,
+            created_at: new Date()
+          }
+        ]);
+
+      if (insertError) throw insertError;
+
+      alert('🎉 Data Implementasi Berhasil Disimpan!');
+      uploadForm.reset();
+      previewImg.style.display = 'none';
+      resetFormValidation();
+
+    } catch (err) {
+      console.error(err);
+      alert('⚠️ Gagal mengirim data: ' + err.message);
+    } finally {
+      btnSubmit.innerText = 'Kirim Data';
+    }
+  });
+
+  // Helper Functions
+  function checkFormValidity() {
+    if (isBarcodeValid && compressedFileBlob) {
+      btnSubmit.disabled = false;
+    } else {
+      btnSubmit.disabled = true;
+    }
+  }
+
+  function resetFormValidation() {
+    isBarcodeValid = false;
+    compressedFileBlob = null;
+    barcodeStatus.innerText = '';
+    fotoStatus.innerText = '';
+    namaBarangInput.value = '';
+    fotoInput.disabled = true;
+    btnSubmit.disabled = true;
+  }
+</script>
+
+</body>
+</html>
