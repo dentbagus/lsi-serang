@@ -74,14 +74,14 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <script>
-  // ==========================================
-  // CONFIG SUPABASE (Ganti dengan kredensial Anda)
-  // ==========================================
-  const SUPABASE_URL = 'https://PROJECT-ANDA.supabase.co';
-  const SUPABASE_ANON_KEY = 'ANON_KEY_ANDA';
-  const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+//   // ==========================================
+//   // CONFIG SUPABASE (Ganti dengan kredensial Anda)
+//   // ==========================================
+//   const SUPABASE_URL = 'https://PROJECT-ANDA.supabase.co';
+//   const SUPABASE_ANON_KEY = 'ANON_KEY_ANDA';
+//   const supabase = supabasejs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // Element DOM
+//   // Element DOM
   const barcodeInput = document.getElementById('barcode');
   const barcodeStatus = document.getElementById('barcodeStatus');
   const namaBarangInput = document.getElementById('namaBarang');
@@ -93,54 +93,54 @@
   const btnScanKamera = document.getElementById('btnScanKamera');
   const readerDiv = document.getElementById('reader');
 
-  let compressedFileBlob = null;
-  let timerDebounce = null;
-  let isBarcodeValid = false;
-  let html5QrCode = null;
+//   let compressedFileBlob = null;
+//   let timerDebounce = null;
+//   let isBarcodeValid = false;
+//   let html5QrCode = null;
 
-  // ==========================================
-  // 1. CEK VALIDASI BARCODE REAL-TIME (DEBOUNCE 300MS)
-  // ==========================================
-  barcodeInput.addEventListener('input', function() {
-    const code = this.value.trim();
-    clearTimeout(timerDebounce);
-    resetFormValidation();
+//   // ==========================================
+//   // 1. CEK VALIDASI BARCODE REAL-TIME (DEBOUNCE 300MS)
+//   // ==========================================
+//   barcodeInput.addEventListener('input', function() {
+//     const code = this.value.trim();
+//     clearTimeout(timerDebounce);
+//     resetFormValidation();
 
-    if (!code) return;
+//     if (!code) return;
 
-    barcodeStatus.className = 'status-msg loading';
-    barcodeStatus.innerText = '🔍 Memeriksa master barcode...';
+//     barcodeStatus.className = 'status-msg loading';
+//     barcodeStatus.innerText = '🔍 Memeriksa master barcode...';
 
-    timerDebounce = setTimeout(async () => {
-      const { data, error } = await supabase
-        .from('master_barang') // Nama tabel master barcode Anda
-        .select('barcode, nama_barang')
-        .eq('barcode', code)
-        .maybeSingle();
+//     timerDebounce = setTimeout(async () => {
+//       const { data, error } = await supabase
+//         .from('master_barang') // Nama tabel master barcode Anda
+//         .select('barcode, nama_barang')
+//         .eq('barcode', code)
+//         .maybeSingle();
 
-      if (error) {
-        barcodeStatus.className = 'status-msg invalid';
-        barcodeStatus.innerText = '⚠️ Gagal terhubung ke database server.';
-        return;
-      }
+//       if (error) {
+//         barcodeStatus.className = 'status-msg invalid';
+//         barcodeStatus.innerText = '⚠️ Gagal terhubung ke database server.';
+//         return;
+//       }
 
-      if (data) {
-        isBarcodeValid = true;
-        barcodeStatus.className = 'status-msg valid';
-        barcodeStatus.innerText = '✅ Barcode Valid!';
-        namaBarangInput.value = data.nama_barang;
-        fotoInput.disabled = false; // Buka akses input foto
-        checkFormValidity();
-      } else {
-        isBarcodeValid = false;
-        barcodeStatus.className = 'status-msg invalid';
-        barcodeStatus.innerText = '❌ Barcode tidak terdaftar dalam master!';
-        namaBarangInput.value = '';
-        fotoInput.disabled = true;
-        btnSubmit.disabled = true;
-      }
-    }, 300);
-  });
+//       if (data) {
+//         isBarcodeValid = true;
+//         barcodeStatus.className = 'status-msg valid';
+//         barcodeStatus.innerText = '✅ Barcode Valid!';
+//         namaBarangInput.value = data.nama_barang;
+//         fotoInput.disabled = false; // Buka akses input foto
+//         checkFormValidity();
+//       } else {
+//         isBarcodeValid = false;
+//         barcodeStatus.className = 'status-msg invalid';
+//         barcodeStatus.innerText = '❌ Barcode tidak terdaftar dalam master!';
+//         namaBarangInput.value = '';
+//         fotoInput.disabled = true;
+//         btnSubmit.disabled = true;
+//       }
+//     }, 300);
+//   });
 
   // ==========================================
   // 2. FITUR SCAN BARCODE VIA KAMERA HP
